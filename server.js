@@ -87,9 +87,9 @@ app.post("/generate", async (req, res) => {
   try {
     const { jd, resume, customPrompt } = req.body;
 
-    const prompt = customPrompt && customPrompt.length > 10
+    const prompt = customPrompt && customPrompt.trim().length > 10
       ? customPrompt
-      : "Act as an interview copilot and give smart answers.";
+      : "Act as an interview copilot and give smart, concise, helpful answers based on the candidate resume and the job description.";
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -104,7 +104,16 @@ app.post("/generate", async (req, res) => {
         messages: [
           {
             role: "user",
-            content: `${prompt}\n\nJob Description:\n${jd}\n\nResume:\n${resume}`
+            content:
+`${prompt}
+
+Job Description:
+${jd}
+
+Resume:
+${resume}
+
+Please generate a strong interview support response.`
           }
         ]
       })
@@ -112,13 +121,21 @@ app.post("/generate", async (req, res) => {
 
     const data = await response.json();
 
-    res.json(data);
+    let text = "No response received.";
+
+    if (data && Array.isArray(data.content) && data.content.length > 0) {
+      text = data.content
+        .filter(item => item.type === "text")
+        .map(item => item.text)
+        .join("\n");
+    }
+
+    res.json({ text, raw: data });
   } catch (err) {
     console.error("Claude API error:", err);
     res.status(500).json({ error: "Claude request failed" });
   }
 });
-
 
 // 🧪 HEALTH CHECK
 app.get("/", (req, res) => {
